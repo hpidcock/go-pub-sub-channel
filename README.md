@@ -30,7 +30,7 @@ for {
 ## Publishing
 
 ```go
-err := rt.Publish("channel_id", "Hello World!")
+err := rt.Publish(context.Background(), "channel_id", "Hello World!")
 if err == router.ErrNotDelivered {
     // The message didn't get delivered to any subscribers.
 } else if err == router.ErrTimedOut {
