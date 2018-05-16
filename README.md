@@ -1,5 +1,7 @@
 # Go Pub Sub Channels
 
+[![Build Status](https://travis-ci.org/hpidcock/go-pub-sub-channel.svg?branch=master)](https://travis-ci.org/hpidcock/go-pub-sub-channel)
+
 Easily send messages between multiple go routines with error response handling.
 
 ## Setup
