@@ -59,8 +59,6 @@ func NewRouter() *Router {
 }
 
 func (router *Router) waitFor(msg pub, errChan chan error, count int) {
-	defer close(errChan)
-
 	var resErr error
 	for i := 0; i < count; i++ {
 		select {
@@ -73,6 +71,8 @@ func (router *Router) waitFor(msg pub, errChan chan error, count int) {
 			}
 		}
 	}
+
+	close(errChan)
 
 	if resErr != nil {
 		msg.result <- multierror.Flatten(resErr)
@@ -90,11 +90,12 @@ exit:
 			if ok && len(channel) > 1 {
 				count := len(channel)
 				errChan := make(chan error, count)
+				pubMsg := Message{
+					Obj:    msg.obj,
+					Result: errChan,
+				}
 				for _, channelSub := range channel {
-					channelSub <- Message{
-						Obj:    msg.obj,
-						Result: errChan,
-					}
+					channelSub <- pubMsg
 				}
 				go router.waitFor(msg, errChan, count)
 			} else if ok && len(channel) == 1 {
@@ -150,8 +151,6 @@ func (router *Router) Close() {
 
 func (router *Router) Publish(ctx context.Context, channelID string, obj interface{}) error {
 	result := make(chan error, 1)
-	defer close(result)
-
 	router.pubChan <- pub{
 		channelID: channelID,
 		obj:       obj,
@@ -161,6 +160,7 @@ func (router *Router) Publish(ctx context.Context, channelID string, obj interfa
 
 	select {
 	case err := <-result:
+		close(result)
 		return err
 	case <-ctx.Done():
 		return ErrTimedOut
@@ -168,15 +168,15 @@ func (router *Router) Publish(ctx context.Context, channelID string, obj interfa
 }
 
 func (router *Router) Subscribe(channelID string) chan Message {
-	subChan := make(chan Message, 10)
+	msgChan := make(chan Message, 10)
 	done := make(chan struct{}, 0)
 	router.subChan <- sub{
 		channelID: channelID,
-		ch:        subChan,
+		ch:        msgChan,
 		done:      done,
 	}
 	<-done
-	return subChan
+	return msgChan
 }
 
 func (router *Router) Unsubscribe(channelID string, ch chan Message) chan struct{} {
