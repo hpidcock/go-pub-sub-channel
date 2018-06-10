@@ -150,6 +150,16 @@ func (router *Router) Close() {
 }
 
 func (router *Router) Publish(ctx context.Context, channelID string, obj interface{}) error {
+	result := router.NonBlockingPublish(ctx, channelID, obj)
+	select {
+	case err := <-result:
+		return err
+	case <-ctx.Done():
+		return ErrTimedOut
+	}
+}
+
+func (router *Router) NonBlockingPublish(ctx context.Context, channelID string, obj interface{}) <-chan error {
 	result := make(chan error, 1)
 	router.pubChan <- pub{
 		channelID: channelID,
@@ -157,14 +167,7 @@ func (router *Router) Publish(ctx context.Context, channelID string, obj interfa
 		result:    result,
 		ctx:       ctx,
 	}
-
-	select {
-	case err := <-result:
-		close(result)
-		return err
-	case <-ctx.Done():
-		return ErrTimedOut
-	}
+	return result
 }
 
 func (router *Router) Subscribe(channelID string) chan Message {
